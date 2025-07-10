@@ -12,16 +12,16 @@ def fetch_aladin_detail(url):
     soup = BeautifulSoup(res.text, "html.parser")
 
     # 제목
-    title_tag = soup.select_one("span.Ere_bo_title")
+    title_tag = soup.select_one("#Ere_prod_allwrap > div.Ere_prod_topwrap > div.Ere_prod_titlewrap > div.left > div > ul > li:nth-child(2) > div > a")
     title = title_tag.text.strip() if title_tag else "제목 없음"
 
     # 저자/옮긴이 등
-    creators_tags = soup.select("li.Ere_sub2_title")
+    creators_tags = soup.select("#Ere_prod_allwrap > div.Ere_prod_topwrap > div.Ere_prod_titlewrap > div.left > div > ul > li.Ere_sub2_title > a:nth-child(1)")
     creators = [c.text.strip() for c in creators_tags] if creators_tags else ["저자 정보 없음"]
     creators_text = " ; ".join(creators)
 
     # 출판사 및 발행연도
-    pub_tag = soup.select_one("span.Ere_pub")
+    pub_tag = soup.select_one("s#Ere_prod_allwrap > div.Ere_prod_topwrap > div.Ere_prod_titlewrap > div.left > div > ul > li.Ere_sub2_title > a:nth-child(5)")
     pub_text = pub_tag.text.strip() if pub_tag else ""
     # 출판사와 연도 분리 (예: "문학동네, 2023")
     publisher = ""
