@@ -1,77 +1,74 @@
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
+import re
 
-def extract_book_info_from_detail(url):
+def fetch_aladin_detail(url):
     headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(url, headers=headers)
-    if response.status_code != 200:
-        return "도서 상세 페이지 요청 실패"
+    res = requests.get(url, headers=headers)
+    if res.status_code != 200:
+        return "상세 페이지 요청 실패"
 
-    soup = BeautifulSoup(response.text, "html.parser")
+    soup = BeautifulSoup(res.text, "html.parser")
 
-    # 245 $a: 제목
+    # 제목
     title_tag = soup.select_one("span.Ere_bo_title")
     title = title_tag.text.strip() if title_tag else "제목 없음"
 
-    # 245 $c: 저자/옮긴이/그린이
-    creators = soup.select("li.Ere_sub2_title")
-    creators_text = " ; ".join([c.text.strip() for c in creators]) if creators else "저자 정보 없음"
+    # 저자/옮긴이 등
+    creators_tags = soup.select("li.Ere_sub2_title")
+    creators = [c.text.strip() for c in creators_tags] if creators_tags else ["저자 정보 없음"]
+    creators_text = " ; ".join(creators)
 
-    # 260과 300 필드 대체용 (간단 처리)
-    publisher_info_tag = soup.select_one("span.Ere_pub")
-    publisher_info = publisher_info_tag.text.strip() if publisher_info_tag else ""
-    
-    # 출판사, 연도 분리
-    publisher = publisher_info.split(",")[0].strip() if "," in publisher_info else publisher_info
-    pubyear = publisher_info.split(",")[1].strip() if "," in publisher_info else "발행연도 없음"
+    # 출판사 및 발행연도
+    pub_tag = soup.select_one("span.Ere_pub")
+    pub_text = pub_tag.text.strip() if pub_tag else ""
+    # 출판사와 연도 분리 (예: "문학동네, 2023")
+    publisher = ""
+    pubyear = ""
+    if "," in pub_text:
+        parts = pub_text.split(",")
+        publisher = parts[0].strip()
+        pubyear = parts[1].strip()
+    else:
+        publisher = pub_text
 
-    # 300 필드 (간단히 "1책"으로 표현)
-    physical = "1책"
+    # 형태사항 (300필드) - 쪽수 등 확인해서 크롤링 필요하면 여기에 추가
+    physical_desc = "1책"  # 일단 기본값
 
     return {
         "245": f"=245  10$a{title} /$c{creators_text}",
         "260": f"=260  \\$a[출판지 미상] :$b{publisher},$c{pubyear}.",
-        "300": f"=300  \\$a{physical}."
+        "300": f"=300  \\$a{physical_desc}."
     }
 
-def search_aladin(isbn):
-    search_url = f"https://www.aladin.co.kr/search/wsearchresult.aspx?SearchTarget=All&SearchWord={isbn}"
+def search_by_isbn(isbn):
+    # 알라딘 상세페이지는 ISBN 검색 후 첫번째 결과의 상세페이지로 이동
+    search_url = f"https://www.aladin.co.kr/search/wsearchresult.aspx?SearchWord={isbn}"
     headers = {"User-Agent": "Mozilla/5.0"}
+    res = requests.get(search_url, headers=headers)
+    if res.status_code != 200:
+        return "검색 페이지 요청 실패"
 
-    response = requests.get(search_url, headers=headers)
-    if response.status_code != 200:
-        return "검색 요청 실패"
+    soup = BeautifulSoup(res.text, "html.parser")
+    first_link = soup.select_one(".bo3")
+    if not first_link or not first_link.get("href"):
+        return "도서 상세페이지 링크를 찾을 수 없습니다."
 
-    soup = BeautifulSoup(response.text, "html.parser")
-    # 첫 번째 도서 상세 페이지 링크 추출
-    link_tag = soup.select_one(".bo3")
-    if not link_tag or not link_tag.get("href"):
-        return "도서 링크를 찾을 수 없습니다"
+    detail_url = first_link["href"]
+    return fetch_aladin_detail(detail_url)
 
-    detail_url = link_tag["href"]
-    return extract_book_info_from_detail(detail_url)
+st.title("📚 알라딘 상세 페이지 KORMARC 크롤러 (ISBN)")
 
-# Streamlit 인터페이스
-st.title("📚 KORMARC 필드 추출기 (ISBN 기반)")
+isbn = st.text_input("ISBN을 입력하세요:")
 
-isbn_input = st.text_input("ISBN을 입력하세요:")
-
-def show_kormarc_line(field: str):
-    st.markdown(f"<pre style='white-space:pre-wrap; word-break:break-all; font-family:monospace'>{field}</pre>", unsafe_allow_html=True)
-
-if isbn_input:
-    with st.spinner("검색 중입니다..."):
-        result = search_aladin(isbn_input)
+if isbn:
+    with st.spinner("검색 중..."):
+        result = search_by_isbn(isbn)
         if isinstance(result, dict):
-            st.subheader("📄 KORMARC 필드 출력")
-            show_kormarc_line(result["245"])
-            show_kormarc_line(result["260"])
-            show_kormarc_line(result["300"])
-
-            
-
+            st.subheader("KORMARC 필드 출력")
+            st.text(result["245"])
+            st.text(result["260"])
+            st.text(result["300"])
         else:
             st.warning(result)
-
-
