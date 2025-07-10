@@ -64,10 +64,12 @@ if isbn_input:
     with st.spinner("검색 중입니다..."):
         result = search_aladin(isbn_input)
         if isinstance(result, dict):
-    st.subheader("📄 KORMARC 필드 출력")
-    show_kormarc_line(result["245"])
-    show_kormarc_line(result["260"])
-    show_kormarc_line(result["300"])
+        st.subheader("📄 KORMARC 필드 출력")
+        show_kormarc_line(result["245"])
+        show_kormarc_line(result["260"])
+        show_kormarc_line(result["300"])
+
+            
 
         else:
             st.warning(result)
