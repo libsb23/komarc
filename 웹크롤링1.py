@@ -1,55 +1,65 @@
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
-import re
 
-def search_aladin_kormarc(isbn):
-    url = f"https://www.aladin.co.kr/search/wsearchresult.aspx?SearchTarget=All&SearchWord={isbn}"
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
-
+def extract_book_info_from_detail(url):
+    headers = {"User-Agent": "Mozilla/5.0"}
     response = requests.get(url, headers=headers)
     if response.status_code != 200:
-        return "요청 실패"
+        return "도서 상세 페이지 요청 실패"
 
     soup = BeautifulSoup(response.text, "html.parser")
-    item = soup.select_one(".ss_book_box")
-    if not item:
-        return "검색 결과 없음"
 
     # 245 $a: 제목
-    title = item.select_one(".bo3").text.strip() if item.select_one(".bo3") else "제목 없음"
+    title_tag = soup.select_one("span.Ere_bo_title")
+    title = title_tag.text.strip() if title_tag else "제목 없음"
 
-    # 245 $c: 저자, 그린이, 옮긴이만 추출
-    author_info_raw = item.select_one(".ss_book_list").text.strip() if item.select_one(".ss_book_list") else ""
-    author_lines = [line.strip() for line in author_info_raw.split('\n') if line.strip()]
-    author_line = author_lines[0] if author_lines else "저자 정보 없음"
+    # 245 $c: 저자/옮긴이/그린이
+    creators = soup.select("li.Ere_sub2_title")
+    creators_text = " ; ".join([c.text.strip() for c in creators]) if creators else "저자 정보 없음"
 
-    # 출판사 및 연도
-    publisher_match = re.search(r'/\s*([^:]+)\s*:', author_info_raw)
-    year_match = re.search(r'(\d{4})', author_info_raw)
-    publisher = publisher_match.group(1).strip() if publisher_match else "출판사 정보 없음"
-    pubyear = year_match.group(1) if year_match else "발행연도 없음"
+    # 260과 300 필드 대체용 (간단 처리)
+    publisher_info_tag = soup.select_one("span.Ere_pub")
+    publisher_info = publisher_info_tag.text.strip() if publisher_info_tag else ""
+    
+    # 출판사, 연도 분리
+    publisher = publisher_info.split(",")[0].strip() if "," in publisher_info else publisher_info
+    pubyear = publisher_info.split(",")[1].strip() if "," in publisher_info else "발행연도 없음"
 
-    # 300 필드: 설명 길이를 형태로 변환
-    description = item.select_one(".ss_ht1").text.strip() if item.select_one(".ss_ht1") else ""
-    page_info = f"{len(description)}자 분량 요약" if description else "형태 정보 없음"
+    # 300 필드 (간단히 "1책"으로 표현)
+    physical = "1책"
 
     return {
-        "245": f"=245  10$a{title} /$c{author_line}",
+        "245": f"=245  10$a{title} /$c{creators_text}",
         "260": f"=260  \\$a[출판지 미상] :$b{publisher},$c{pubyear}.",
-        "300": f"=300  \\$a{page_info}."
+        "300": f"=300  \\$a{physical}."
     }
 
-# Streamlit UI
-st.title("📚 KORMARC 형식 변환기 (ISBN 기반)")
+def search_aladin(isbn):
+    search_url = f"https://www.aladin.co.kr/search/wsearchresult.aspx?SearchTarget=All&SearchWord={isbn}"
+    headers = {"User-Agent": "Mozilla/5.0"}
+
+    response = requests.get(search_url, headers=headers)
+    if response.status_code != 200:
+        return "검색 요청 실패"
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    # 첫 번째 도서 상세 페이지 링크 추출
+    link_tag = soup.select_one(".bo3")
+    if not link_tag or not link_tag.get("href"):
+        return "도서 링크를 찾을 수 없습니다"
+
+    detail_url = link_tag["href"]
+    return extract_book_info_from_detail(detail_url)
+
+# Streamlit 인터페이스
+st.title("📚 KORMARC 필드 추출기 (ISBN 기반)")
 
 isbn_input = st.text_input("ISBN을 입력하세요:")
 
 if isbn_input:
     with st.spinner("검색 중입니다..."):
-        result = search_aladin_kormarc(isbn_input)
+        result = search_aladin(isbn_input)
         if isinstance(result, dict):
             st.subheader("📄 KORMARC 필드 출력")
             st.code(result["245"])
