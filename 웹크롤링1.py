@@ -57,23 +57,19 @@ st.title("📚 KORMARC 필드 추출기 (ISBN 기반)")
 
 isbn_input = st.text_input("ISBN을 입력하세요:")
 
+def show_kormarc_line(field: str):
+    st.markdown(f"<pre style='white-space:pre-wrap; word-break:break-all; font-family:monospace'>{field}</pre>", unsafe_allow_html=True)
+
 if isbn_input:
     with st.spinner("검색 중입니다..."):
         result = search_aladin(isbn_input)
         if isinstance(result, dict):
-            st.subheader("📄 KORMARC 필드 출력")
-            st.code(result["245"])
-            st.code(result["260"])
-            st.code(result["300"])
-        else:
-            st.warning(result)
-# 줄바꿈 포함된 코드 블록 출력 함수
-def show_kormarc_line(field: str):
-    st.markdown(f"<pre style='white-space:pre-wrap; word-break:break-all; font-family:monospace'>{field}</pre>", unsafe_allow_html=True)
-
-# 결과 출력부에서 변경
-if isinstance(result, dict):
     st.subheader("📄 KORMARC 필드 출력")
     show_kormarc_line(result["245"])
     show_kormarc_line(result["260"])
     show_kormarc_line(result["300"])
+
+        else:
+            st.warning(result)
+
+
