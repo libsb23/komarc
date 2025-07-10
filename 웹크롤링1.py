@@ -65,9 +65,9 @@ if isbn_input:
         result = search_aladin(isbn_input)
         if isinstance(result, dict):
             st.subheader("📄 KORMARC 필드 출력")
-                show_kormarc_line(result["245"])
-                show_kormarc_line(result["260"])
-                show_kormarc_line(result["300"])
+            show_kormarc_line(result["245"])
+            show_kormarc_line(result["260"])
+            show_kormarc_line(result["300"])
 
             
 
