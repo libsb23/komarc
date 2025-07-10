@@ -12,7 +12,7 @@ def fetch_aladin_detail(url):
     soup = BeautifulSoup(res.text, "html.parser")
 
     # 제목
-    title_tag = soup.select_one("#Ere_prod_allwrap > div.Ere_prod_topwrap > div.Ere_prod_titlewrap > div.left > div > ul > li:nth-child(2) > div > a")
+    title_tag = soup.select_one("#Ere_prod_allwrap > div.Ere_prod_topwrap > div.Ere_prod_titlewrap > div.left > div > ul > li:nth-child(2) > div > span")
     title = title_tag.text.strip() if title_tag else "제목 없음"
 
     # 저자/옮긴이 등
