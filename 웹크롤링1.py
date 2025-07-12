@@ -3,14 +3,13 @@ import requests
 from bs4 import BeautifulSoup
 import re
 
+# 상세페이지 파싱
 def parse_aladin_detail_page(html):
     soup = BeautifulSoup(html, "html.parser")
 
-    # 제목
     title_tag = soup.select_one("span.Ere_bo_title")
     title = title_tag.text.strip() if title_tag else "제목 없음"
 
-    # 저자/출판사/날짜 포함 li
     li_tag = soup.select_one("li.Ere_sub2_title")
 
     author_list = []
@@ -22,7 +21,6 @@ def parse_aladin_detail_page(html):
         last_a_before_date = None
 
         for i, node in enumerate(children):
-            # a 태그인 경우
             if getattr(node, "name", None) == "a":
                 name = node.text.strip()
                 next_text = children[i+1].strip() if i+1 < len(children) and isinstance(children[i+1], str) else ""
@@ -34,7 +32,6 @@ def parse_aladin_detail_page(html):
                 else:
                     last_a_before_date = name
 
-            # 날짜 텍스트 처리
             elif isinstance(node, str):
                 date_match = re.search(r"\d{4}-\d{2}-\d{2}", node)
                 if date_match:
@@ -52,6 +49,7 @@ def parse_aladin_detail_page(html):
         "300": f"=300  \\$a1책."
     }
 
+# ISBN 검색 → 상세페이지 이동 → 파싱
 def search_aladin_by_isbn(isbn):
     search_url = f"https://www.aladin.co.kr/search/wsearchresult.aspx?SearchWord={isbn}"
     headers = {"User-Agent": "Mozilla/5.0"}
@@ -78,20 +76,22 @@ def search_aladin_by_isbn(isbn):
         return None, f"예외 발생: {str(e)}"
 
 # Streamlit 인터페이스
-st.title("📚 알라딘 KORMARC 필드 추출기")
+st.title("📚 알라딘 KORMARC 필드 추출기 (다중 ISBN 지원)")
 
-isbn = st.text_input("ISBN을 입력하세요:")
+isbn_input = st.text_area("ISBN을 '/'로 구분하여 입력하세요:")
 
-if isbn:
-    with st.spinner("도서 정보를 불러오는 중..."):
-        result, error = search_aladin_by_isbn(isbn)
+if isbn_input:
+    isbn_list = [isbn.strip() for isbn in isbn_input.split("/") if isbn.strip()]
 
-        if error:
-            st.error(f"❌ 오류 발생: {error}")
-        elif result:
-            st.subheader("📄 KORMARC 필드 출력")
-            st.code(result["245"], language="text")
-            st.code(result["260"], language="text")
-            st.code(result["300"], language="text")
-        else:
-            st.warning("도서 정보를 찾을 수 없습니다.")
+    for idx, isbn in enumerate(isbn_list, 1):
+        st.markdown(f"### 📘 {idx}. ISBN: `{isbn}`")
+        with st.spinner("검색 중..."):
+            result, error = search_aladin_by_isbn(isbn)
+            if error:
+                st.error(f"❌ 오류: {error}")
+            elif result:
+                st.code(result["245"], language="text")
+                st.code(result["260"], language="text")
+                st.code(result["300"], language="text")
+            else:
+                st.warning("결과 없음")
