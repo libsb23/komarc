@@ -24,8 +24,8 @@ def get_publisher_location(publisher_name):
         publisher_names = sheet.col_values(2)[1:]  # B열
         regions = sheet.col_values(3)[1:]          # C열
 
-        def normalize(name):
-            return re.sub(r"\s|\(.*?\)|주식회사|㈜|도서출판|출판사", "", name).lower()
+        def normalize(publisher_name):
+            return re.sub(r"\s|\(.*?\)|주식회사|㈜|도서출판|출판사", "", publisher_name).lower()
 
         target = normalize(publisher_name)
 
