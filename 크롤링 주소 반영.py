@@ -2,33 +2,40 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 import re
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
-# 🔹 KPIPA 출판사 주소 추출 함수
+# 🔹 Google Sheets에서 지역명 추출
 def get_publisher_location(publisher_name):
-    url = "https://bnk.kpipa.or.kr/home/v3/addition/adiPblshrInfoList.do"
-    headers = {
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-        "User-Agent": "Mozilla/5.0"
-    }
-    data = {
-        "searchText": publisher_name,
-        "searchCondition": "all",
-        "pageIndex": 1,
-        "orderBy": "reg_dt"
-    }
-
     try:
-        res = requests.post(url, data=data, headers=headers)
-        if res.status_code == 200:
-            soup = BeautifulSoup(res.text, "html.parser")
-            addr_tag = soup.select_one("table tbody tr td:nth-child(3)")
-            if addr_tag:
-                full_address = addr_tag.text.strip()
-                return full_address.split()[0] if full_address else "출판지 미상"
-            else:
-                return "출판지 미상"
-        else:
-            return f"오류 {res.status_code}"
+        # Google Sheets 인증
+        scope = [
+            "https://spreadsheets.google.com/feeds",
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        creds = ServiceAccountCredentials.from_json_keyfile_name(
+            "C:/Users/ht030/Downloads/marcobot-hyunsu-ff2972cb2858.json", scope
+        )
+        client = gspread.authorize(creds)
+
+        # 시트 열기
+        sheet = client.open("출판사 DB").worksheet("Sheet1")
+        publisher_names = sheet.col_values(2)[1:]  # B열: 출판사명 (헤더 제외)
+        regions = sheet.col_values(3)[1:]          # C열: 지역
+
+        # 정규화 함수
+        def normalize(name):
+            return re.sub(r"\s|\(.*?\)|주식회사|㈜|도서출판|출판사", "", name).lower()
+
+        target = normalize(publisher_name)
+
+        for sheet_name, region in zip(publisher_names, regions):
+            if normalize(sheet_name) == target:
+                return region.strip() or "출판지 미상"
+
+        return "출판지 미상"
+
     except Exception as e:
         return f"예외 발생: {str(e)}"
 
@@ -131,7 +138,6 @@ if isbn_input:
             publisher = result["publisher"]
             if publisher == "출판사 정보 없음":
                 st.warning("출판사명이 없어서 지역 검색을 건너뜁니다.")
-                # 출판지 미상으로 출력
                 updated_260 = f"=260  \\$a[출판지 미상] :$b{publisher},$c{result['pubyear']}."
                 st.code(updated_260, language="text")
                 continue
