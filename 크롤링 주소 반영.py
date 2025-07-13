@@ -9,11 +9,9 @@ import copy
 # 🔹 Google Sheets에서 지역명 추출
 def get_publisher_location(publisher_name):
     try:
-        # 구글 시크릿에서 credentials 불러오기
         json_key = copy.deepcopy(st.secrets["gspread"])
         json_key["private_key"] = json_key["private_key"].replace('\\n', '\n')
 
-        # 인증 및 시트 연결
         scope = [
             "https://spreadsheets.google.com/feeds",
             "https://www.googleapis.com/auth/spreadsheets",
@@ -23,10 +21,9 @@ def get_publisher_location(publisher_name):
         client = gspread.authorize(creds)
         sheet = client.open("출판사 DB").worksheet("Sheet1")
 
-        publisher_names = sheet.col_values(2)[1:]  # B열: 출판사명
-        regions = sheet.col_values(3)[1:]          # C열: 지역
+        publisher_names = sheet.col_values(2)[1:]  # B열
+        regions = sheet.col_values(3)[1:]          # C열
 
-        # 이름 정규화
         def normalize(name):
             return re.sub(r"\s|\(.*?\)|주식회사|㈜|도서출판|출판사", "", name).lower()
 
@@ -37,11 +34,10 @@ def get_publisher_location(publisher_name):
                 return region.strip() or "출판지 미상"
 
         return "출판지 미상"
-
     except Exception as e:
         return f"예외 발생: {str(e)}"
 
-# 🔹 알라딘 상세 페이지 파싱
+# 🔹 알라딘 상세 페이지 파싱 + 형태사항 처리
 def parse_aladin_detail_page(html):
     soup = BeautifulSoup(html, "html.parser")
     title_tag = soup.select_one("span.Ere_bo_title")
@@ -73,6 +69,32 @@ def parse_aladin_detail_page(html):
                     if last_a_before_date:
                         publisher = last_a_before_date
 
+    # ✅ 형태사항 정보 추출
+    form_wrap = soup.select_one("div.conts_info_list1")
+    a_part = ""
+    c_part = ""
+
+    if form_wrap:
+        form_items = [item.strip() for item in form_wrap.stripped_strings]
+        if len(form_items) >= 1:
+            page_match = re.search(r"\d+", form_items[0])
+            if page_match:
+                a_part = f"{page_match.group()} p."
+        if len(form_items) >= 2:
+            size_match = re.search(r"\d+", form_items[1])
+            if size_match:
+                c_part = f"{size_match.group()} cm"
+
+    # 최종 300 필드
+    if a_part or c_part:
+        field_300 = "=300  \\\\$a"
+        if a_part:
+            field_300 += a_part
+        if c_part:
+            field_300 += f" ;$c{c_part}."
+    else:
+        field_300 = "=300  \\$a1책."
+
     creator_str = " ; ".join(author_list) if author_list else "저자 정보 없음"
     publisher = publisher if publisher else "출판사 정보 없음"
     pubyear = pubyear if pubyear else "발행연도 없음"
@@ -83,7 +105,7 @@ def parse_aladin_detail_page(html):
         "publisher": publisher,
         "pubyear": pubyear,
         "245": f"=245  10$a{title} /$c{creator_str}",
-        "300": f"=300  \\$a1책."
+        "300": field_300
     }
 
 # 🔹 알라딘 ISBN 검색
