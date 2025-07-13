@@ -83,8 +83,8 @@ def parse_aladin_detail_page(html):
                 page_match = re.search(r"\d+", item)
                 if page_match:
                     a_part = f"{page_match.group()} p."
-            # 크기: 'mm'로 끝나는 경우
-            elif item.endswith("mm"):
+            # 크기: 문자열에 'mm' 포함된 경우
+            elif "mm" in item:
                 size_match = re.search(r"(\d+)\s*[\*x×X]\s*(\d+)", item)
                 if size_match:
                     width = int(size_match.group(1))
