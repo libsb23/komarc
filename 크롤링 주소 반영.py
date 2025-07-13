@@ -4,14 +4,16 @@ from bs4 import BeautifulSoup
 import re
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import copy
 
 # 🔹 Google Sheets에서 지역명 추출
 def get_publisher_location(publisher_name):
     try:
-        # Streamlit secrets에서 인증 정보 가져오기
-        json_key = st.secrets["gspread"]
+        # 구글 시크릿에서 credentials 불러오기
+        json_key = copy.deepcopy(st.secrets["gspread"])
         json_key["private_key"] = json_key["private_key"].replace('\\n', '\n')
 
+        # 인증 및 시트 연결
         scope = [
             "https://spreadsheets.google.com/feeds",
             "https://www.googleapis.com/auth/spreadsheets",
@@ -19,13 +21,12 @@ def get_publisher_location(publisher_name):
         ]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(json_key, scope)
         client = gspread.authorize(creds)
-
-        # 시트 열기
         sheet = client.open("출판사 DB").worksheet("Sheet1")
+
         publisher_names = sheet.col_values(2)[1:]  # B열: 출판사명
         regions = sheet.col_values(3)[1:]          # C열: 지역
 
-        # 정규화 함수
+        # 이름 정규화
         def normalize(name):
             return re.sub(r"\s|\(.*?\)|주식회사|㈜|도서출판|출판사", "", name).lower()
 
@@ -43,12 +44,10 @@ def get_publisher_location(publisher_name):
 # 🔹 알라딘 상세 페이지 파싱
 def parse_aladin_detail_page(html):
     soup = BeautifulSoup(html, "html.parser")
-
     title_tag = soup.select_one("span.Ere_bo_title")
     title = title_tag.text.strip() if title_tag else "제목 없음"
 
     li_tag = soup.select_one("li.Ere_sub2_title")
-
     author_list = []
     publisher = ""
     pubyear = ""
@@ -61,14 +60,12 @@ def parse_aladin_detail_page(html):
             if getattr(node, "name", None) == "a":
                 name = node.text.strip()
                 next_text = children[i+1].strip() if i+1 < len(children) and isinstance(children[i+1], str) else ""
-
                 if "지은이" in next_text:
                     author_list.append(f"{name} 지음")
                 elif "옮긴이" in next_text:
                     author_list.append(f"{name} 옮김")
                 else:
                     last_a_before_date = name
-
             elif isinstance(node, str):
                 date_match = re.search(r"\d{4}-\d{2}-\d{2}", node)
                 if date_match:
@@ -146,8 +143,6 @@ if isbn_input:
             with st.spinner(f"📍 '{publisher}'의 지역정보 검색 중..."):
                 location = get_publisher_location(publisher)
                 st.success(f"🏙️ 지역: **{location}**")
-
-                # 지역정보를 반영한 260 필드
                 updated_260 = f"=260  \\$a{location} :$b{publisher},$c{result['pubyear']}."
                 st.code(updated_260, language="text")
         else:
