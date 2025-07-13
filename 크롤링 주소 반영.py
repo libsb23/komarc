@@ -37,7 +37,7 @@ def get_publisher_location(publisher_name):
     except Exception as e:
         return f"예외 발생: {str(e)}"
 
-# 🔹 알라딘 상세 페이지 파싱 + 형태사항 처리
+# 🔹 알라딘 상세 페이지 파싱 (형태사항 포함)
 def parse_aladin_detail_page(html):
     soup = BeautifulSoup(html, "html.parser")
     title_tag = soup.select_one("span.Ere_bo_title")
@@ -80,12 +80,27 @@ def parse_aladin_detail_page(html):
             page_match = re.search(r"\d+", form_items[0])
             if page_match:
                 a_part = f"{page_match.group()} p."
-        if len(form_items) >= 2:
-            size_match = re.search(r"\d+", form_items[1])
-            if size_match:
-                c_part = f"{size_match.group()} cm"
 
-    # 최종 300 필드
+        if len(form_items) >= 2:
+            size_text = form_items[1]
+            size_match = re.search(r"(\d+)\s*[\*x×X]\s*(\d+)", size_text)
+            if size_match:
+                width = int(size_match.group(1))
+                height = int(size_match.group(2))
+
+                if (
+                    width == height or
+                    width > height or
+                    width < height / 2
+                ):
+                    w_cm = round(width / 10)
+                    h_cm = round(height / 10)
+                    c_part = f"{w_cm}x{h_cm} cm"
+                else:
+                    h_cm = round(height / 10)
+                    c_part = f"{h_cm} cm"
+
+    # 최종 300 필드 조립
     if a_part or c_part:
         field_300 = "=300  \\\\$a"
         if a_part:
