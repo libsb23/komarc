@@ -1,63 +1,60 @@
 import streamlit as st
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-import time
+import requests
 
-# 크롬 드라이버 설정
-@st.cache_resource
-def get_driver():
-    options = webdriver.ChromeOptions()
-    options.add_argument('--headless')  # GUI 없이 실행
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    return driver
-
-def search_publisher(publisher_name):
-    driver = get_driver()
-    driver.get("https://bnk.kpipa.or.kr/home/v3/addition/adiPblshrInfoList")
-    time.sleep(3)  # 페이지 로딩 대기
+def search_publisher_info(keyword):
+    url = "https://bnk.kpipa.or.kr/api/addition/pblshrInfoList"
+    headers = {
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "searchKeyword": keyword,
+        "pageIndex": 1,
+        "pageSize": 10
+    }
 
     try:
-        # 검색창 찾기 및 검색어 입력
-        search_box = driver.find_element(By.ID, "searchKeyword")
-        search_box.clear()
-        search_box.send_keys(publisher_name)
-        search_box.send_keys(Keys.RETURN)
+        response = requests.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        data = response.json()
 
-        time.sleep(2)  # 검색 결과 대기
-
-        # 검색 결과 추출
-        results = driver.find_elements(By.CSS_SELECTOR, "#pblshrListBody > tr")
+        results = data.get("resultList", [])
         if not results:
             return "검색 결과가 없습니다."
 
-        data = []
-        for result in results:
-            cols = result.find_elements(By.TAG_NAME, "td")
-            if len(cols) >= 4:
-                name = cols[0].text.strip()
-                area = cols[2].text.strip()
-                category = cols[3].text.strip()
-                data.append((name, area, category))
-        
-        return data
+        output = []
+        for item in results:
+            name = item.get("pblshrNm", "")
+            ceo = item.get("ceoNm", "")
+            biz_no = item.get("bizno", "")
+            tel = item.get("telno", "")
+            address = item.get("addr", "")
+            category = item.get("bizrDtlNm", "")
+            region = item.get("regionNm", "")
+            output.append({
+                "출판사명": name,
+                "대표자명": ceo,
+                "사업자번호": biz_no,
+                "전화번호": tel,
+                "주소": address,
+                "업종": category,
+                "지역": region
+            })
+        return output
 
     except Exception as e:
         return f"오류 발생: {e}"
 
 # Streamlit UI
-st.title("출판사 정보 검색기")
-publisher_name = st.text_input("출판사명을 입력하세요:")
+st.title("📚 출판사 정보 검색기 (BeautifulSoup 없이)")
 
-if publisher_name:
-    st.write(f"🔍 '{publisher_name}' 검색 결과:")
-    results = search_publisher(publisher_name)
-    if isinstance(results, str):
-        st.error(results)
+keyword = st.text_input("🔍 출판사명을 입력하세요:")
+
+if keyword:
+    result = search_publisher_info(keyword)
+    if isinstance(result, str):
+        st.error(result)
     else:
-        for name, area, category in results:
-            st.success(f"📚 출판사명: {name}\n📍 지역: {area}\n📂 업종: {category}")
+        for i, item in enumerate(result, 1):
+            st.markdown(f"### 결과 {i}")
+            for key, value in item.items():
+                st.write(f"**{key}**: {value}")
