@@ -69,36 +69,39 @@ def parse_aladin_detail_page(html):
                     if last_a_before_date:
                         publisher = last_a_before_date
 
-    # ✅ 형태사항 정보 추출
+    # ✅ 형태사항 정보 추출 (쪽수와 크기 구분 패턴 적용)
     form_wrap = soup.select_one("div.conts_info_list1")
     a_part = ""
     c_part = ""
 
     if form_wrap:
         form_items = [item.strip() for item in form_wrap.stripped_strings]
-        if len(form_items) >= 1:
-            page_match = re.search(r"\d+", form_items[0])
-            if page_match:
-                a_part = f"{page_match.group()} p."
+        
+        for item in form_items:
+            # 쪽수: '쪽' 또는 'p'로 끝나는 경우
+            if re.search(r"(쪽|p)\s*$", item):
+                page_match = re.search(r"\d+", item)
+                if page_match:
+                    a_part = f"{page_match.group()} p."
+            # 크기: 'mm'로 끝나는 경우
+            elif item.endswith("mm"):
+                size_match = re.search(r"(\d+)\s*[\*x×X]\s*(\d+)", item)
+                if size_match:
+                    width = int(size_match.group(1))
+                    height = int(size_match.group(2))
 
-        if len(form_items) >= 2:
-            size_text = form_items[1]
-            size_match = re.search(r"(\d+)\s*[\*x×X]\s*(\d+)", size_text)
-            if size_match:
-                width = int(size_match.group(1))
-                height = int(size_match.group(2))
-
-                if (
-                    width == height or
-                    width > height or
-                    width < height / 2
-                ):
-                    w_cm = round(width / 10)
-                    h_cm = round(height / 10)
-                    c_part = f"{w_cm}x{h_cm} cm"
-                else:
-                    h_cm = round(height / 10)
-                    c_part = f"{h_cm} cm"
+                    # 조건에 따라 단일/복합 cm 표현
+                    if (
+                        width == height or
+                        width > height or
+                        width < height / 2
+                    ):
+                        w_cm = round(width / 10)
+                        h_cm = round(height / 10)
+                        c_part = f"{w_cm}x{h_cm} cm"
+                    else:
+                        h_cm = round(height / 10)
+                        c_part = f"{h_cm} cm"
 
     # 최종 300 필드 조립
     if a_part or c_part:
