@@ -7,6 +7,42 @@ from oauth2client.service_account import ServiceAccountCredentials
 import copy
 import traceback
 
+# 🔹 발행국 부호 구하기 (구글 시트 Sheet2 활용)
+def get_country_code_by_region(region_name):
+    try:
+        st.write(f"🌍 발행국 부호 찾는 중... 참조 지역: `{region_name}`")
+
+        json_key = dict(st.secrets["gspread"])
+        json_key["private_key"] = json_key["private_key"].replace('\\n', '\n')
+
+        scope = [
+            "https://spreadsheets.google.com/feeds",
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(json_key, scope)
+        client = gspread.authorize(creds)
+        sheet = client.open("출판사 DB").worksheet("Sheet2")
+
+        region_col = sheet.col_values(1)[1:]  # A열: 지역명 (한국어)
+        code_col = sheet.col_values(2)[1:]    # B열: 발행국 부호
+
+        def normalize_region(text):
+            return re.sub(r"\s", "", text).lower()
+
+        normalized_input = normalize_region(region_name)
+        preview_sheet_regions = [normalize_region(r) for r in region_col[:10]]
+        st.write(f"📋 발행국 지역 리스트 (정규화된 상위 10개): `{preview_sheet_regions}`")
+
+        for sheet_region, country_code in zip(region_col, code_col):
+            if normalize_region(sheet_region) == normalized_input:
+                return country_code.strip() or "xxu"  # 기본값
+
+        return "xxu"  # 기본 부호 (미상)
+
+    except Exception as e:
+        return "xxu"
+
 # 🔹 Google Sheets에서 지역명 추출 (디버깅 포함)
 def get_publisher_location(publisher_name):
     try:
