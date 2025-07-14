@@ -185,14 +185,16 @@ if isbn_input:
                 with st.spinner(f"📍 '{publisher}'의 지역정보 검색 중..."):
                     location = get_publisher_location(publisher)
 
+                        # 디버깅 or 지역정보 메시지 (가장 마지막)
+            if publisher != "출판사 정보 없음":
+                st.info(f"🏙️ 지역정보 결과: **{location}**")
+                
             updated_260 = f"=260  \\$a{location} :$b{publisher},$c{pubyear}."
             st.code(updated_260, language="text")  # 260 필드 출력
 
             # 300 필드 출력
             st.code(result["300"], language="text")
 
-            # 디버깅 or 지역정보 메시지 (가장 마지막)
-            if publisher != "출판사 정보 없음":
-                st.info(f"🏙️ 지역정보 결과: **{location}**")
+
         else:
             st.warning("결과 없음")
