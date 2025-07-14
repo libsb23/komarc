@@ -12,11 +12,8 @@ def get_publisher_location(publisher_name):
     try:
         st.write("🧪 [DEBUG] get_publisher_location() 시작:", publisher_name)
 
-        json_key = copy.deepcopy(st.secrets["gspread"])
+        json_key = dict(st.secrets["gspread"])  # ✅ deepcopy → dict()
         json_key["private_key"] = json_key["private_key"].replace('\\n', '\n')
-
-        st.write("🔐 secrets keys:", list(st.secrets.keys()))
-        st.write("🔐 gspread keys:", list(st.secrets['gspread'].keys()))
 
         scope = [
             "https://spreadsheets.google.com/feeds",
@@ -36,20 +33,14 @@ def get_publisher_location(publisher_name):
         target = normalize(publisher_name)
         st.write("🔍 [DEBUG] 정규화된 입력:", target)
 
-        # 1차: 정규화 매칭
         for sheet_name, region in zip(publisher_names, regions):
-            norm_sheet = normalize(sheet_name)
-            if norm_sheet == target:
-                st.write("✅ [DEBUG] 정규화 일치:", sheet_name)
+            if normalize(sheet_name) == target:
                 return region.strip() or "출판지 미상"
 
-        # 2차: 원문 비교 매칭
         for sheet_name, region in zip(publisher_names, regions):
             if sheet_name.strip() == publisher_name.strip():
-                st.write("✅ [DEBUG] 원문 일치:", sheet_name)
                 return region.strip() or "출판지 미상"
 
-        st.write("⚠️ [DEBUG] 일치 항목 없음")
         return "출판지 미상"
 
     except Exception as e:
