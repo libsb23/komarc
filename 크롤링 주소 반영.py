@@ -29,13 +29,20 @@ def get_publisher_location(publisher_name):
 
         target = normalize(publisher_name)
 
+        # 1차: 정규화 매칭
         for sheet_name, region in zip(publisher_names, regions):
             if normalize(sheet_name) == target:
+                return region.strip() or "출판지 미상"
+
+        # 2차: 원문 비교 매칭
+        for sheet_name, region in zip(publisher_names, regions):
+            if sheet_name.strip() == publisher_name.strip():
                 return region.strip() or "출판지 미상"
 
         return "출판지 미상"
     except Exception as e:
         return f"예외 발생: {str(e)}"
+
 
 # 🔹 알라딘 상세 페이지 파싱 (형태사항 포함)
 def parse_aladin_detail_page(html):
