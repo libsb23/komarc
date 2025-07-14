@@ -163,29 +163,36 @@ if isbn_input:
     isbn_list = [isbn.strip() for isbn in isbn_input.split("/") if isbn.strip()]
 
     for idx, isbn in enumerate(isbn_list, 1):
-        st.markdown(f"---\n### 📘 {idx}. ISBN: `{isbn}`")
-        with st.spinner("🔍 도서 정보 검색 중..."):
-            result, error = search_aladin_by_isbn(isbn)
+    st.markdown(f"---\n### 📘 {idx}. ISBN: `{isbn}`")
+    with st.spinner("🔍 도서 정보 검색 중..."):
+        result, error = search_aladin_by_isbn(isbn)
 
-        if error:
-            st.error(f"❌ 오류: {error}")
-            continue
+    if error:
+        st.error(f"❌ 오류: {error}")
+        continue
 
-        if result:
-            st.code(result["245"], language="text")
-            st.code(result["300"], language="text")
+    if result:
+        publisher = result["publisher"]
+        pubyear = result["pubyear"]
 
-            publisher = result["publisher"]
-            if publisher == "출판사 정보 없음":
-                st.warning("출판사명이 없어서 지역 검색을 건너뜁니다.")
-                updated_260 = f"=260  \\$a[출판지 미상] :$b{publisher},$c{result['pubyear']}."
-                st.code(updated_260, language="text")
-                continue
+        # 245 필드 먼저 출력
+        st.code(result["245"], language="text")
 
+        # 260 필드 구성
+        if publisher == "출판사 정보 없음":
+            location = "[출판지 미상]"
+        else:
             with st.spinner(f"📍 '{publisher}'의 지역정보 검색 중..."):
                 location = get_publisher_location(publisher)
-                st.success(f"🏙️ 지역: **{location}**")
-                updated_260 = f"=260  \\$a{location} :$b{publisher},$c{result['pubyear']}."
-                st.code(updated_260, language="text")
-        else:
-            st.warning("결과 없음")
+
+        updated_260 = f"=260  \\$a{location} :$b{publisher},$c{pubyear}."
+        st.code(updated_260, language="text")  # 260 필드 출력
+
+        # 300 필드 출력
+        st.code(result["300"], language="text")
+
+        # 디버깅 or 지역정보 메시지 (가장 마지막)
+        if publisher != "출판사 정보 없음":
+            st.info(f"🏙️ 지역정보 결과: **{location}**")
+    else:
+        st.warning("결과 없음")
