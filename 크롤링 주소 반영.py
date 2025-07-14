@@ -10,9 +10,10 @@ import traceback
 # 🔹 Google Sheets에서 지역명 추출 (디버깅 포함)
 def get_publisher_location(publisher_name):
     try:
-        st.write("🧪 [DEBUG] get_publisher_location() 시작:", publisher_name)
+        st.write(f"📥 출판사 지역을 구글 시트에서 찾는 중입니다...")
+        st.write(f"🔍 입력된 출판사명: `{publisher_name}`")
 
-        json_key = dict(st.secrets["gspread"])  # ✅ deepcopy → dict()
+        json_key = st.secrets["gspread"]
         json_key["private_key"] = json_key["private_key"].replace('\\n', '\n')
 
         scope = [
@@ -31,22 +32,26 @@ def get_publisher_location(publisher_name):
             return re.sub(r"\s|\(.*?\)|주식회사|㈜|도서출판|출판사", "", name).lower()
 
         target = normalize(publisher_name)
-        st.write("🔍 [DEBUG] 정규화된 입력:", target)
+        st.write(f"🧪 정규화된 입력값: `{target}`")
 
+        # 일부 구글 시트 출판사명 미리보기 출력
+        preview_names = [normalize(name) for name in publisher_names[:10]]
+        st.write(f"📋 구글 시트 내 출판사 정규화 리스트 (상위 10개): `{preview_names}`")
+
+        # 1차: 정규화 매칭
         for sheet_name, region in zip(publisher_names, regions):
             if normalize(sheet_name) == target:
                 return region.strip() or "출판지 미상"
 
+        # 2차: 원문 비교 매칭
         for sheet_name, region in zip(publisher_names, regions):
             if sheet_name.strip() == publisher_name.strip():
                 return region.strip() or "출판지 미상"
 
         return "출판지 미상"
-
     except Exception as e:
-        st.error("❌ 예외 발생:")
-        st.code(traceback.format_exc())
         return f"예외 발생: {str(e)}"
+
 
 # 🔹 알라딘 상세 페이지 파싱 (형태사항 포함)
 def parse_aladin_detail_page(html):
