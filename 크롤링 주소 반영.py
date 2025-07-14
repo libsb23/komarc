@@ -155,7 +155,7 @@ def search_aladin_by_isbn(isbn):
         return None, f"예외 발생: {str(e)}"
 
 # 🔹 Streamlit UI
-st.title("📚 ISBN → 크롤링 → KORMARC 변환기 🎶🎶🎶🎶🎶🎶")
+st.title("📚 ISBN → 크롤링 → KORMARC 변환기 😂")
 
 isbn_input = st.text_area("ISBN을 '/'로 구분하여 입력하세요:")
 
