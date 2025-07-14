@@ -13,7 +13,7 @@ def get_publisher_location(publisher_name):
         st.write(f"📥 출판사 지역을 구글 시트에서 찾는 중입니다...")
         st.write(f"🔍 입력된 출판사명: `{publisher_name}`")
 
-        json_key = st.secrets["gspread"]
+        json_key = copy.deepcopy(st.secrets["gspread"])  # ✔️ deepcopy 필수
         json_key["private_key"] = json_key["private_key"].replace('\\n', '\n')
 
         scope = [
@@ -51,7 +51,6 @@ def get_publisher_location(publisher_name):
         return "출판지 미상"
     except Exception as e:
         return f"예외 발생: {str(e)}"
-
 
 # 🔹 알라딘 상세 페이지 파싱 (형태사항 포함)
 def parse_aladin_detail_page(html):
