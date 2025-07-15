@@ -209,8 +209,14 @@ st.title("📚 ISBN → 크롤링 → KORMARC 변환기 😂")
 
 isbn_input = st.text_area("ISBN을 '/'로 구분하여 입력하세요:")
 
+isbn_input = st.text_area("ISBN을 '/'로 구분하여 입력하세요:")
+
 if isbn_input:
-    isbn_list = [isbn.strip() for isbn in isbn_input.split("/") if isbn.strip()]
+    isbn_list = [
+        re.sub(r"[^\d]", "", isbn)  # ✅ 숫자만 남김: 979-11-94244-18-9 → 9791194244189
+        for isbn in isbn_input.split("/")
+        if isbn.strip()
+    ]
 
     for idx, isbn in enumerate(isbn_list, 1):
         st.markdown(f"---\n### 📘 {idx}. ISBN: `{isbn}`")
