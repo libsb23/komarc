@@ -235,6 +235,11 @@ if isbn_input:
 
             # 300 필드 출력
             st.code(result["300"], language="text")
+            
+            # 008 필드 출력 (발행국 부호)
+            country_code = get_country_code_by_region(location)
+            field_008 = f"=008  \\\\$a{country_code}"
+            st.code(field_008, language="text")
 
 
         else:
