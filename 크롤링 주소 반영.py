@@ -30,15 +30,27 @@ def get_country_code_by_region(region_name):
         # ✅ 정규화 함수
         def normalize_region(region):
             region = region.strip()
-            region = re.sub(r"(광역시|특별시)", "", region)
+            original = region
 
+            # 1. 특별자치도 제거 (단, 따로 표시해 기억)
+            was_teukbyeol = "특별자치도" in region
+            region = re.sub(r"(광역시|특별시|특별자치도)", "", region)
+
+            # 2. 예외 처리
             if region in ["강원도", "제주도", "경기도"]:
                 return region.replace("도", "")
-            elif region.endswith("도") and len(region) >= 4:
+
+            # 3. ~도 처리 (특별자치도였던 항목은 여기서 제외)
+            if region.endswith("도") and len(region) >= 4 and not was_teukbyeol:
                 return region[0] + region[2]
-            elif region.endswith("시"):
+
+            # 4. ~시 처리
+            if region.endswith("시"):
                 return region[:-1]
+
             return region
+
+            
 
         normalized_input = normalize_region(region_name)
         st.write(f"🧪 정규화된 참조지역: `{normalized_input}`")
