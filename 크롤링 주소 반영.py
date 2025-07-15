@@ -24,24 +24,34 @@ def get_country_code_by_region(region_name):
         client = gspread.authorize(creds)
         sheet = client.open("출판사 DB").worksheet("Sheet2")
 
-        region_col = sheet.col_values(1)[1:]  # A열: 지역명 (한국어)
+        region_col = sheet.col_values(1)[1:]  # A열: 지역명 (기준)
         code_col = sheet.col_values(2)[1:]    # B열: 발행국 부호
 
-        def normalize_region(text):
-            return re.sub(r"\s", "", text).lower()
+        # ✅ 정규화 함수
+        def normalize_region(region):
+            region = region.strip()
+            region = re.sub(r"(광역시|특별시)", "", region)
+
+            if region in ["강원도", "제주도", "경기도"]:
+                return region.replace("도", "")
+            elif region.endswith("도") and len(region) >= 4:
+                return region[0] + region[2]
+            elif region.endswith("시"):
+                return region[:-1]
+            return region
 
         normalized_input = normalize_region(region_name)
-        preview_sheet_regions = [normalize_region(r) for r in region_col[:10]]
-        st.write(f"📋 발행국 지역 리스트 (정규화된 상위 10개): `{preview_sheet_regions}`")
+        st.write(f"🧪 정규화된 참조지역: `{normalized_input}`")
 
         for sheet_region, country_code in zip(region_col, code_col):
             if normalize_region(sheet_region) == normalized_input:
-                return country_code.strip() or "xxu"  # 기본값
+                return country_code.strip() or "xxu"
 
-        return "xxu"  # 기본 부호 (미상)
+        return "xxu"  # 미상
 
     except Exception as e:
         return "xxu"
+
 
 # 🔹 Google Sheets에서 지역명 추출 (디버깅 포함)
 def get_publisher_location(publisher_name):
