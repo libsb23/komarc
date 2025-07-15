@@ -140,9 +140,13 @@ st.title("📚 ISBN → API → KORMARC 변환기")
 isbn_input = st.text_area("ISBN을 '/'로 구분하여 입력하세요:")
 
 if isbn_input:
-    isbn_list = [re.sub(r"[^\\d]", "", isbn) for isbn in isbn_input.split("/") if isbn.strip()]
+    isbn_list = [re.sub(r"[^\d]", "", isbn) for isbn in isbn_input.split("/") if isbn.strip()]
 
     for idx, isbn in enumerate(isbn_list, 1):
+        if not isbn:
+            st.error(f"❌ 오류: 빈 ISBN 입력 감지됨")
+            continue
+
         st.markdown(f"---\n### 📘 {idx}. ISBN: `{isbn}`")
         with st.spinner("🔍 도서 정보 검색 중..."):
             result, error = search_aladin_by_isbn(isbn)
@@ -150,6 +154,7 @@ if isbn_input:
         if error:
             st.error(f"❌ 오류: {error}")
             continue
+
 
         if result:
             publisher = result["publisher"]
