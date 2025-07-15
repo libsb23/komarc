@@ -3,8 +3,9 @@ import requests
 import re
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+from bs4 import BeautifulSoup
 
-# 🔹 발행국 부호 구하기 (구글 시트 Sheet2 활용)
+# --- 발행국 부호 구하기 (구글 시트 Sheet2 활용) ---
 def get_country_code_by_region(region_name):
     try:
         st.write(f"🌍 발행국 부호 찾는 중... 참조 지역: `{region_name}`")
@@ -48,7 +49,7 @@ def get_country_code_by_region(region_name):
     except Exception:
         return "xxu"
 
-# 🔹 Google Sheets에서 지역명 추출
+# --- Google Sheets에서 출판사 지역명 추출 ---
 def get_publisher_location(publisher_name):
     try:
         st.write(f"📥 출판사 지역을 구글 시트에서 찾는 중입니다... `{publisher_name}`")
@@ -87,7 +88,7 @@ def get_publisher_location(publisher_name):
     except Exception:
         return "예외 발생"
 
-# 🔹 알라딘 API 기반 데이터 통합 파싱
+# --- API 기반 도서정보 가져오기 ---
 def search_aladin_by_isbn(isbn):
     try:
         ttbkey = st.secrets["aladin"]["ttbkey"]
@@ -120,33 +121,87 @@ def search_aladin_by_isbn(isbn):
         creator_str = " ; ".join(authors) if authors else "저자 정보 없음"
 
         field_245 = f"=245  10$a{title} /$c{creator_str}"
-        field_300 = "=300  \\$a1책."
 
         return {
             "title": title,
             "creator": creator_str,
             "publisher": publisher,
             "pubyear": pubyear,
-            "245": field_245,
-            "300": field_300
+            "245": field_245
         }, None
 
     except Exception as e:
         return None, f"API 예외 발생: {str(e)}"
 
-# 🔹 Streamlit UI
-st.title("📚 ISBN → API → KORMARC 변환기")
+# --- 형태사항 크롤링 추출 ---
+def extract_physical_description_by_crawling(isbn):
+    try:
+        search_url = f"https://www.aladin.co.kr/search/wsearchresult.aspx?SearchWord={isbn}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        res = requests.get(search_url, headers=headers)
+        if res.status_code != 200:
+            return "=300  \\$a1책.", f"검색 실패 (status {res.status_code})"
+
+        soup = BeautifulSoup(res.text, "html.parser")
+        link_tag = soup.select_one("div.ss_book_box a.bo3")
+        if not link_tag or not link_tag.get("href"):
+            return "=300  \\$a1책.", "도서 링크를 찾을 수 없습니다."
+
+        detail_url = link_tag["href"]
+        detail_res = requests.get(detail_url, headers=headers)
+        if detail_res.status_code != 200:
+            return "=300  \\$a1책.", f"상세페이지 요청 실패 (status {detail_res.status_code})"
+
+        detail_soup = BeautifulSoup(detail_res.text, "html.parser")
+        form_wrap = detail_soup.select_one("div.conts_info_list1")
+        a_part = ""
+        c_part = ""
+
+        if form_wrap:
+            form_items = [item.strip() for item in form_wrap.stripped_strings]
+            for item in form_items:
+                if re.search(r"(쪽|p)\s*$", item):
+                    page_match = re.search(r"\d+", item)
+                    if page_match:
+                        a_part = f"{page_match.group()} p."
+                elif "mm" in item:
+                    size_match = re.search(r"(\d+)\s*[\*x×X]\s*(\d+)", item)
+                    if size_match:
+                        width = int(size_match.group(1))
+                        height = int(size_match.group(2))
+                        if width == height or width > height or width < height / 2:
+                            w_cm = round(width / 10)
+                            h_cm = round(height / 10)
+                            c_part = f"{w_cm}x{h_cm} cm"
+                        else:
+                            h_cm = round(height / 10)
+                            c_part = f"{h_cm} cm"
+
+        if a_part or c_part:
+            field_300 = "=300  \\\\$a"
+            if a_part:
+                field_300 += a_part
+            if c_part:
+                field_300 += f" ;$c{c_part}."
+        else:
+            field_300 = "=300  \\$a1책."
+
+        return field_300, None
+
+    except Exception as e:
+        return "=300  \\$a1책.", f"예외 발생: {str(e)}"
+
+
+# --- Streamlit UI ---
+st.title("📚 ISBN → API + 크롤링 → KORMARC 변환기")
 
 isbn_input = st.text_area("ISBN을 '/'로 구분하여 입력하세요:")
 
 if isbn_input:
+    # 하이픈, 공백 등 모두 제거하고 숫자만 추출
     isbn_list = [re.sub(r"[^\d]", "", isbn) for isbn in isbn_input.split("/") if isbn.strip()]
 
     for idx, isbn in enumerate(isbn_list, 1):
-        if not isbn:
-            st.error(f"❌ 오류: 빈 ISBN 입력 감지됨")
-            continue
-
         st.markdown(f"---\n### 📘 {idx}. ISBN: `{isbn}`")
         with st.spinner("🔍 도서 정보 검색 중..."):
             result, error = search_aladin_by_isbn(isbn)
@@ -155,28 +210,35 @@ if isbn_input:
             st.error(f"❌ 오류: {error}")
             continue
 
+        # 형태사항 크롤링
+        with st.spinner("📐 형태사항 크롤링 중..."):
+            field_300, err_300 = extract_physical_description_by_crawling(isbn)
+        if err_300:
+            st.warning(f"⚠️ 형태사항 크롤링 경고: {err_300}")
 
-        if result:
-            publisher = result["publisher"]
-            pubyear = result["pubyear"]
+        publisher = result["publisher"]
+        pubyear = result["pubyear"]
 
-            st.code(result["245"], language="text")
+        # 245 필드 출력
+        st.code(result["245"], language="text")
 
-            if publisher == "출판사 정보 없음":
-                location = "[출판지 미상]"
-            else:
-                with st.spinner(f"📍 '{publisher}'의 지역정보 검색 중..."):
-                    location = get_publisher_location(publisher)
-
-            if publisher != "출판사 정보 없음":
-                st.info(f"🏙️ 지역정보 결과: **{location}**")
-
-            field_260 = f"=260  \\$a{location} :$b{publisher},$c{pubyear}."
-            st.code(field_260, language="text")
-            st.code(result["300"], language="text")
-
-            country_code = get_country_code_by_region(location)
-            st.code(f"=008  \\$a{country_code}", language="text")
-
+        # 260 필드용 출판지역 추출
+        if publisher == "출판사 정보 없음":
+            location = "[출판지 미상]"
         else:
-            st.warning("결과 없음")
+            with st.spinner(f"📍 '{publisher}'의 지역정보 검색 중..."):
+                location = get_publisher_location(publisher)
+
+        if publisher != "출판사 정보 없음":
+            st.info(f"🏙️ 지역정보 결과: **{location}**")
+
+        # 260 필드 출력
+        field_260 = f"=260  \\$a{location} :$b{publisher},$c{pubyear}."
+        st.code(field_260, language="text")
+
+        # 300 필드 출력 (크롤링 결과)
+        st.code(field_300, language="text")
+
+        # 008 필드 출력 (발행국 부호)
+        country_code = get_country_code_by_region(location)
+        st.code(f"=008  \\$a{country_code}", language="text")
