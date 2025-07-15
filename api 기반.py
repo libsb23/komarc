@@ -193,52 +193,69 @@ def extract_physical_description_by_crawling(isbn):
 
 
 # --- Streamlit UI ---
+import streamlit as st
+import requests
+import re
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+from bs4 import BeautifulSoup
+
+# (생략) 기존 함수들은 그대로 유지
+
+# --- Streamlit UI ---
 st.title("📚 ISBN → API + 크롤링 → KORMARC 변환기")
 
 isbn_input = st.text_area("ISBN을 '/'로 구분하여 입력하세요:")
 
 if isbn_input:
-    # 하이픈, 공백 등 모두 제거하고 숫자만 추출
     isbn_list = [re.sub(r"[^\d]", "", isbn) for isbn in isbn_input.split("/") if isbn.strip()]
 
     for idx, isbn in enumerate(isbn_list, 1):
         st.markdown(f"---\n### 📘 {idx}. ISBN: `{isbn}`")
+
+        # 디버깅 및 경고 메시지를 담을 리스트 준비
+        debug_messages = []
+
         with st.spinner("🔍 도서 정보 검색 중..."):
             result, error = search_aladin_by_isbn(isbn)
-
         if error:
-            st.error(f"❌ 오류: {error}")
-            continue
+            debug_messages.append(f"❌ 오류: {error}")
 
         # 형태사항 크롤링
         with st.spinner("📐 형태사항 크롤링 중..."):
             field_300, err_300 = extract_physical_description_by_crawling(isbn)
         if err_300:
-            st.warning(f"⚠️ 형태사항 크롤링 경고: {err_300}")
+            debug_messages.append(f"⚠️ 형태사항 크롤링 경고: {err_300}")
 
-        publisher = result["publisher"]
-        pubyear = result["pubyear"]
+        if result:
+            publisher = result["publisher"]
+            pubyear = result["pubyear"]
 
-        # 245 필드 출력
-        st.code(result["245"], language="text")
+            if publisher == "출판사 정보 없음":
+                location = "[출판지 미상]"
+            else:
+                with st.spinner(f"📍 '{publisher}'의 지역정보 검색 중..."):
+                    location = get_publisher_location(publisher)
 
-        # 260 필드용 출판지역 추출
-        if publisher == "출판사 정보 없음":
-            location = "[출판지 미상]"
+            if publisher != "출판사 정보 없음":
+                debug_messages.append(f"🏙️ 지역정보 결과: **{location}**")
+
+            country_code = get_country_code_by_region(location)
+
+            # ▶️ 서지정보 묶음 출력
+            with st.container():
+                st.code(f"=008  \\$a{country_code}", language="text")
+                st.code(result["245"], language="text")
+                st.code(f"=260  \\$a{location} :$b{publisher},$c{pubyear}.", language="text")
+                st.code(field_300, language="text")
+                
+
         else:
-            with st.spinner(f"📍 '{publisher}'의 지역정보 검색 중..."):
-                location = get_publisher_location(publisher)
+            debug_messages.append("⚠️ 결과 없음")
 
-        if publisher != "출판사 정보 없음":
-            st.info(f"🏙️ 지역정보 결과: **{location}**")
+        # ▶️ 디버깅 메시지 별도 출력
+        if debug_messages:
+            with st.expander("🛠️ 디버깅 및 경고 메시지 보기"):
+                for msg in debug_messages:
+                    st.write(msg)
 
-        # 260 필드 출력
-        field_260 = f"=260  \\$a{location} :$b{publisher},$c{pubyear}."
-        st.code(field_260, language="text")
-
-        # 300 필드 출력 (크롤링 결과)
-        st.code(field_300, language="text")
-
-        # 008 필드 출력 (발행국 부호)
-        country_code = get_country_code_by_region(location)
-        st.code(f"=008  \\$a{country_code}", language="text")
