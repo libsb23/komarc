@@ -106,7 +106,7 @@ def search_aladin_by_isbn(isbn):
 
         data = res.json()
         if "item" not in data or not data["item"]:
-            return None, "도서 정보를 찾을 수 없습니다."
+            return None, f"도서 정보를 찾을 수 없습니다. [응답 내용: {data}]"
 
         book = data["item"][0]
 
