@@ -70,3 +70,16 @@ def update_sheet_with_publisher(isbn):
             sheet.update_cell(idx, 3, publisher)  # C열 = 3번째 열
             return f"✅ ISBN {isbn} → 출판사명: {publisher}"
     return f"❌ ISBN {isbn} 이(가) 시트에서 발견되지 않음"
+# 
+import streamlit as st
+
+st.title("📚 ISBN으로 출판사명 추출 (BNK + Google Sheets)")
+
+isbn_input = st.text_input("ISBN 입력")
+
+if st.button("출판사명 추출 및 시트 반영"):
+    if isbn_input:
+        result = update_sheet_with_publisher(isbn_input.strip())
+        st.success(result)
+    else:
+        st.warning("ISBN을 입력해주세요.")
